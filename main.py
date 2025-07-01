@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from BreedSight import run_cross_validation
 
 # Define file paths
+# changes according to the user directory
 training_file_path = "C:/Users/Ashmitha/Desktop/BreedSight/BreedSight/Example_files/phenotypic_data.csv"
 training_additive_file_path = "C:/Users/Ashmitha/Desktop/BreedSight/BreedSight/Example_files/Training_additive.csv"
 testing_file_path = "C:/Users/Ashmitha/Desktop/BreedSight/BreedSight/Example_files/Testing_data.csv"
@@ -25,15 +26,39 @@ train_pred, val_pred, test_pred, train_plot, val_plot, test_plot, train_csv, val
 
 # Print results safely
 print("Training predictions:")
-print(train_pred.head())
+print(train_pred.head() if train_pred is not None else "No training predictions available")
 
 # Create output directory
 os.makedirs("output", exist_ok=True)
 
 # Save predictions
-train_pred.to_csv("output/train_predictions.csv", index=False)
-val_pred.to_csv("output/val_predictions.csv", index=False)
-test_pred.to_csv("output/test_predictions.csv", index=False)
+def save_data(data, filename):
+    """Save data to CSV file, handling both DataFrames and file paths"""
+    if data is None:
+        print(f"No {filename} data available")
+        return
+    
+    output_path = f"output/{filename}.csv"
+    
+    try:
+        if isinstance(data, pd.DataFrame):
+            data.to_csv(output_path, index=False)
+            print(f"Saved DataFrame to {output_path}")
+        elif isinstance(data, str):  # If it's a file path
+            if os.path.exists(data):
+                shutil.copy(data, output_path)
+                print(f"Copied {data} to {output_path}")
+            else:
+                print(f"File {data} does not exist")
+        else:
+            print(f"Unsupported data type for {filename}: {type(data)}")
+    except Exception as e:
+        print(f"Error processing {filename}: {str(e)}")
+
+# Save prediction files
+save_data(train_pred, "train_predictions")
+save_data(val_pred, "val_predictions")
+save_data(test_pred, "test_predictions")
 
 def handle_plot(plot, plot_name):
     """Handle saving plot whether it's a matplotlib object or file path."""
@@ -67,20 +92,11 @@ handle_plot(train_plot, "train_plot")
 handle_plot(val_plot, "val_plot")
 handle_plot(test_plot, "test_plot")
 
-# Save additional CSV files if they exist
-def save_csv(data, filename):
-    if data is not None:
-        try:
-            data.to_csv(f"output/{filename}.csv", index=False)
-            print(f"Saved {filename}.csv")
-        except Exception as e:
-            print(f"Error saving {filename}.csv: {str(e)}")
-    else:
-        print(f"No {filename} data available")
+# Save additional CSV files
+save_data(train_csv, "train_additional")
+save_data(val_csv, "val_additional")
+save_data(test_csv, "test_additional")
 
-save_csv(train_csv, "train_additional")
-save_csv(val_csv, "val_additional")
-save_csv(test_csv, "test_additional")
-
-print("Processing complete. Results saved in 'output' directory.")
-    
+print("\nProcessing complete. Results saved in 'output' directory.")
+print("Contents of output directory:")
+print(os.listdir("output"))
