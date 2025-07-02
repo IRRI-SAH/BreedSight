@@ -22,7 +22,7 @@ from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 import tempfile
 import os
-import gradio as gr
+#import gradio as gr
 from sklearn.model_selection import train_test_split
 ###################Seed default#################
 RANDOM_STATE = 42  
