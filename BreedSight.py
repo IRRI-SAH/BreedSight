@@ -22,17 +22,17 @@ from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 import tempfile
 import os
-#import gradio as gr
 from sklearn.model_selection import train_test_split
 ###################Seed default#################
 RANDOM_STATE = 42  
 ##########################Model Initialization#############
+# User can change the number of layers and neurons accordingly 
+
 def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None, 
             epochs=1000, batch_size=64, learning_rate=0.0001, 
-            l2_reg=0.001, dropout_rate=0.8, 
-            rf_n_estimators=200, rf_max_depth=42, 
-            alpha=0.5, verbose=1):
-    
+            l2_reg=0.001, dropout_rate=0.5, 
+            rf_n_estimators=200, rf_max_depth=30, 
+            alpha=0.2, verbose=1):
     
     # Initialize results
     predicted_test = None
@@ -51,7 +51,7 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
     valy_scaled = target_scaler.transform(valy.reshape(-1, 1)).flatten() if valy is not None else None
     testy_scaled = target_scaler.transform(testy.reshape(-1, 1)).flatten() if testy is not None else None
     
-    # -------------------------------- Build FNN Model
+    # -------------------------------- Build DNN Model
     def build_dnn_model(input_shape):
         inputs = tf.keras.Input(shape=(input_shape,))   
         x = Dense(512, kernel_initializer='he_normal', 
@@ -62,14 +62,14 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         
         # First residual block
         res = x
-        x = Dense(256, kernel_initializer='he_normal', 
+        x = Dense(64, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)   
         
         if res.shape[-1] != x.shape[-1]:
-            res = Dense(256, kernel_initializer='he_normal', 
+            res = Dense(64, kernel_initializer='he_normal', 
                        kernel_regularizer=regularizers.l2(l2_reg))(res)
         x = Add()([x, res])
         x = BatchNormalization()(x)
@@ -78,14 +78,14 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         
         # Second residual block
         res = x
-        x = Dense(128, kernel_initializer='he_normal', 
+        x = Dense(16, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)   
         
         if res.shape[-1] != x.shape[-1]:
-            res = Dense(128, kernel_initializer='he_normal', 
+            res = Dense(16, kernel_initializer='he_normal', 
                        kernel_regularizer=regularizers.l2(l2_reg))(res)
         x = Add()([x, res])
         x = BatchNormalization()(x)
@@ -93,19 +93,19 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         x = LeakyReLU(alpha=0.1)(x)
 
         # Final layers
-        x = Dense(64, kernel_initializer='he_normal', 
+        x = Dense(8, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
 
-        x = Dense(32, kernel_initializer='he_normal', 
+        x = Dense(4, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
         
-        outputs = Dense(1, activation="relu")(x)
+        outputs = Dense(1, activation="linear")(x)
         model = tf.keras.Model(inputs, outputs)
         
         model.compile(loss=tf.keras.losses.Huber(delta=0.1), 
@@ -116,17 +116,18 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
     dnn_model = build_dnn_model(trainX.shape[1])
     
     # -------------------------------- Train DNN Model
-    callbacks = [
-        EarlyStopping(monitor='val_loss', verbose=verbose, 
-                     restore_best_weights=True, patience=15)
-    ]
+    ""' un comment this if the model is overfitting ""'
+    #callbacks = [
+       # EarlyStopping(monitor='val_loss', verbose=verbose, 
+                    # restore_best_weights=True, patience=20)
+   # ]
     
     if valX is not None and valy is not None:
         validation_data = (valX_scaled, valy_scaled)
         validation_split = 0.0
     else:
         validation_data = None
-        validation_split = 0.2
+        validation_split = 0.1
     
     history = dnn_model.fit(
         trainX_scaled, 
@@ -136,10 +137,10 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         validation_data=validation_data,
         validation_split=validation_split,
         verbose=verbose, 
-        callbacks=callbacks
+        #callbacks=callbacks
     )
     
-    # -------------------------------- Train RF Model
+    # -------------------------------- Train Random Forest Model
     rf_model = RandomForestRegressor(
         n_estimators=rf_n_estimators, 
         max_depth=rf_max_depth, 
@@ -175,9 +176,22 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         print(f"Train samples: {len(trainX)}, Validation samples: {len(valX) if valX is not None else 'N/A'}")
         
     return predicted_train, predicted_val, predicted_test, history, rf_model
-############################################# Calculating Genomic features
+
 def compute_genomic_features(X, ref_features=None, is_train=False):
+    """
+    Compute genomic relationship features without data leakage
     
+    Parameters:
+    -----------
+    X: Input genomic data
+    ref_features: Reference features from training data (None for training data)
+    is_train: Boolean indicating if this is training data
+    
+    Returns:
+    --------
+    X_final: Transformed features
+    ref_features: Dictionary of reference statistics (if is_train=True)
+    """
     if is_train and ref_features is None:
         # For training data when no reference provided
         scaler = StandardScaler()
@@ -221,7 +235,7 @@ def compute_genomic_features(X, ref_features=None, is_train=False):
         raise ValueError("Invalid combination of is_train and ref_features parameters")
     
     return X_final, ref_features
-###############################Calculating metrices####
+
 def calculate_metrics(true_values, predicted_values):
     """Compute performance metrics between true and predicted values"""
     mask = ~np.isnan(predicted_values)
@@ -235,7 +249,7 @@ def calculate_metrics(true_values, predicted_values):
     r2 = r2_score(true_values, predicted_values)
     corr = pearsonr(true_values, predicted_values)[0]
     return mse, rmse, corr, r2
-#############################10-Fold-Cross validation##############
+
 def KFoldCrossValidation(training_data, training_additive, testing_data, testing_additive,
                         epochs=1000, learning_rate=0.0001, batch_size=64,
                         outer_n_splits=10, output_file='cross_validation_results.csv',
@@ -292,8 +306,8 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
         # Feature selection without leakage
         if feature_selection:
             selector = SelectFromModel(
-                RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE), 
-                threshold="1.25*median"
+                RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE), 
+                threshold="mean"
             )
             selector.fit(X_train_genomic, outer_trainy)
             X_train_final = selector.transform(X_train_genomic)
@@ -467,7 +481,7 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
                                    is_test=True)]
     
     return results_df, train_pred_df, val_pred_df, test_pred_final_df, plot_files_train, plot_files_val, plot_files_test
-############################Final############
+
 def run_cross_validation(training_file, training_additive_file, testing_file, testing_additive_file, 
                         feature_selection=True, learning_rate=0.0001, **kwargs):
     """
