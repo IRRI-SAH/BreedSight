@@ -251,7 +251,7 @@ def calculate_metrics(true_values, predicted_values):
     return mse, rmse, corr, r2
 
 def KFoldCrossValidation(training_data, training_additive, testing_data, testing_additive,
-                        epochs=1000, learning_rate=0.001, batch_size=128,
+                        epochs=1000, learning_rate=0.001, batch_size=64,
                         outer_n_splits=10, output_file='cross_validation_results.csv',
                         train_pred_file='train_predictions.csv', 
                         val_pred_file='validation_predictions.csv',
