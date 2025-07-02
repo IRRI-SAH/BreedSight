@@ -2,7 +2,7 @@ import os
 import shutil
 import pandas as pd
 import matplotlib.pyplot as plt
-from BreedSight import run_cross_validation
+from BreedSight import run_cross_validation # change BreedSight to BreedSightTuning if you're using BreedSightTuning Model#
 
 # Define file paths
 training_file_path = "C:/Users/Ashmitha/Desktop/BreedSight/BreedSight/Example_files/training_phenotypic_data.csv"
