@@ -24,7 +24,7 @@ import tempfile
 import os
 from sklearn.model_selection import train_test_split
 ###################Seed default#################
-RANDOM_STATE = 42  
+RANDOM_STATE = 60 
 ##########################Model Initialization#############
 # User can change the number of layers and neurons accordingly 
 
@@ -32,7 +32,7 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
             epochs=1000, batch_size=64, learning_rate=0.0001, 
             l2_reg=0.001, dropout_rate=0.5, 
             rf_n_estimators=200, rf_max_depth=30, 
-            alpha=0.2, verbose=1):
+            alpha=0.5, verbose=1):
     
     # Initialize results
     predicted_test = None
@@ -127,7 +127,7 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         validation_split = 0.0
     else:
         validation_data = None
-        validation_split = 0.1
+        validation_split = 0.05
     
     history = dnn_model.fit(
         trainX_scaled, 
@@ -251,7 +251,7 @@ def calculate_metrics(true_values, predicted_values):
     return mse, rmse, corr, r2
 
 def KFoldCrossValidation(training_data, training_additive, testing_data, testing_additive,
-                        epochs=1000, learning_rate=0.0001, batch_size=64,
+                        epochs=1000, learning_rate=0.001, batch_size=128,
                         outer_n_splits=10, output_file='cross_validation_results.csv',
                         train_pred_file='train_predictions.csv', 
                         val_pred_file='validation_predictions.csv',
@@ -379,7 +379,7 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
     # Feature selection
     if feature_selection:
         selector = SelectFromModel(
-            RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE), 
+            RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE), 
             threshold="1.25*median"
         )
         selector.fit(X_train_genomic, y_train_raw)
