@@ -105,7 +105,7 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
         
-        outputs = Dense(1, activation="linear")(x)
+        outputs = Dense(1, activation="linear")(x) #change to relu if required#
         model = tf.keras.Model(inputs, outputs)
         
         model.compile(loss=tf.keras.losses.Huber(delta=0.1), 
