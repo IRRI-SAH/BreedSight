@@ -10,8 +10,8 @@
 ---
 
 ## 📝 User Note
-*[Brief introduction about the tool's purpose and target audience. Example:]*  
-BreedSight is designed for rice breeders and geneticists to...
+
+BreedSight is an parallel ensemble based python package that combines deep learning with random forest to estimate Genomic Estimated Breeding Values (GEBVs) and recommend optimal crosses, enabling breeders to accelerate genetic gain and streamline selection decisions in rice improvement programs.
 
 **Key Features:**
 - *[Feature 1: e.g., "Supports multi-trait prediction"]*
