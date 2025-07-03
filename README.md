@@ -1,5 +1,5 @@
 <h1 align="center">
-  <b>🧬 BREEDSIGHT</b>
+  <b>🧬 BreedSight</b>
 </h1>
 
 <h3 align="center">
@@ -59,7 +59,7 @@ BreedSight integrates DNNs with an RF ensemble, utilizing an advanced hyperparam
 
 ## 📂 Input Data Requirements
 **Accepted Formats:**
-Input data format is given in Example_files folder
-For generating Training and Testing set use clustering.py 
-For calculating Additive matrix use Additive_Dominance.R
+- Input data format is given in Example_files folder
+- For generating Training and Testing set use clustering.py 
+- For calculating Additive matrix use Additive_Dominance.R
 
