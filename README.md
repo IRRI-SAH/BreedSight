@@ -57,20 +57,9 @@ Hyperparameter Optimization
 
 BreedSight integrates DNNs with an RF ensemble, utilizing an advanced hyperparameter optimization framework to strike a balance between predictive accuracy and computational efficiency. The DNN features a five-layer feedforward architecture (512-256-128-64-32 neurons) with residual connections to mitigate vanishing gradients and LeakyReLU activations (α=0.1) to ensure robust gradient flow. Hyperparameters were tuned using nested 10-fold cross-validation, with the outer loop assessing generalization and the inner loop optimizing via grid search over: learning rate ([1e-5, 1e-2], default 0.0001 with Adam optimizer), L2 regularization ([1e-4, 1e-1], selected 0.001), dropout rate ([0.5, 0.9], chosen 0.8), batch size ([32, 256], chosen  64), and network depth (3–5 layers, selected 5). Early stopping (patience=15) prevents overfitting. The RF component uses 200 estimators with a maximum depth of 42, optimized via out-of-bag error analysis. Predictions are combined via a weighted ensemble (α tuned in [0.6-0.8] based on validation performance. This hybrid architecture, validated through 10-fold cross-validation, leverages the DNN’s capacity for complex patterns and the RF’s robustness, achieving high accuracy and efficiency. 
 
- 
-  
-
-
-
 ## 📂 Input Data Requirements
 **Accepted Formats:**
-- *[Format 1, e.g., "VCF (v4.2+)"]*
-- *[Format 2, e.g., "Plink binary (.bed/.bim/.fam)"]*
-- *[Format 3, e.g., "HDF5"]*
-
-**Minimum Requirements:**
-- *[Requirement 1, e.g., "≥ 50K SNPs"]*
-- *[Requirement 2, e.g., "Sample size ≥ 200"]*
-- *[Requirement 3, e.g., "MAF ≥ 0.05"]*
-
+Input data format is given in Example_files folder
+For generating Training and Testing set use clustering.py 
+For calculating Additive matrix use Additive_Dominance.R
 
