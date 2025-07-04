@@ -27,7 +27,7 @@ BreedSight is an ensemble machine learning model that combines deep neural netwo
 
  
 
-Random Feature Selection 
+**Random Feature Selection** 
 
 During the construction of each tree, RFs randomly selected a subset of features (e.g., genetic markers) to consider splitting at each node. This limited the influence of dominant predictors and encouraged diversity among trees, which further reduced the model’s variance and helped prevent overfitting. This makes RFs better at handling high-dimensional genomic data (where there are many features but few samples) by creating smoother decision boundaries and improving generalization (Herrerra V.M et al., 2019). The parallel ensemble model combining RF and DNN architectures leveraged RF's efficiency and robust feature selection alongwith DNNs' ability to capture complex nonlinear relationships while mitigating their individual weaknesses for genomic prediction tasks. 
 
@@ -37,23 +37,23 @@ During the construction of each tree, RFs randomly selected a subset of features
 
  
 
-Epistatic Interaction  
+**Epistatic Interaction**  
 
 The model extended the standard additive framework by incorporating additive-by-additive epistatic effects, following the theoretical foundation established by Henderson (1985). This enhanced model formulation is expressed as 
 
-y = 1μ + Zg + Zi + ε, 
+**y = 1μ + Zg + Zi + ε,** 
 
 where y represents the phenotypic observations, μ is the overall mean, Z is the design matrix, g denotes additive genetic effects [g ∼ N(0, σ²_G G)], i represents epistatic effects [i ∼ N(0, σ²_I I)], and ε is the residual error term. The epistatic relationship matrix I is constructed through the Hadamard product (element-wise multiplication) of the additive genomic relationship matrix G (I = A ⊙ A), following the standardization approach described by Vitezica et al. (2017). The inclusion of the epistatic term enables the model to capture non-additive genetic variance. The resulting model provided a computationally efficient yet biologically meaningful framework for estimating breeding values in traits influenced by epistatic interactions, while preserving the interpretability and robustness of the linear mixed model approach. 
 
  
 
-Ten-fold-cross validation 
+**Ten-fold-cross validation** 
 
 Cross-validation represents a standard methodology for assessing the predictive accuracy of genomic selection (GS) models (Estaghvirou et al 2013). In this study, we implemented a tenfold cross-validation scheme. For each iteration, nine subsets (90% of samples) served as the training set to develop the prediction model, while the remaining subset (10% of samples) functioned as the validation set. Following model training, phenotypic values for individuals in the test group were predicted exclusively from their genotypic data. 
 
  
 
-Hyperparameter Optimization  
+**Hyperparameter Optimization** 
 
 BreedSight integrates DNNs with an RF ensemble, utilizing an advanced hyperparameter optimization framework to strike a balance between predictive accuracy and computational efficiency. The DNN features a five-layer feedforward architecture (512-256-128-64-32 neurons) with residual connections to mitigate vanishing gradients and LeakyReLU activations (α=0.1) to ensure robust gradient flow. Hyperparameters were tuned using nested 10-fold cross-validation, with the outer loop assessing generalization and the inner loop optimizing via grid search over: learning rate ([1e-5, 1e-2], default 0.0001 with Adam optimizer), L2 regularization ([1e-4, 1e-1], selected 0.001), dropout rate ([0.5, 0.9], chosen 0.8), batch size ([32, 256], chosen  64), and network depth (3–5 layers, selected 5). Early stopping (patience=15) prevents overfitting. The RF component uses 200 estimators with a maximum depth of 42, optimized via out-of-bag error analysis. Predictions are combined via a weighted ensemble (α tuned in [0.6-0.8] based on validation performance. This hybrid architecture, validated through 10-fold cross-validation, leverages the DNN’s capacity for complex patterns and the RF’s robustness, achieving high accuracy and efficiency. 
 
