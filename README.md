@@ -62,4 +62,6 @@ BreedSight integrates DNNs with an RF ensemble, utilizing an advanced hyperparam
 - Input data format is given in Example_files folder
 - For generating Training and Testing set use clustering.py 
 - For calculating Additive matrix use Additive_Dominance.R
+##  User's Note:
+- Please refer key_note_to_users file for package installation
 
