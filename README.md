@@ -23,9 +23,7 @@ BreedSight is an parallel ensemble based python package that combines deep learn
 ## 🧠 Model Information
 **The BreedSight framework**
 
-BreedSight is an ensemble machine learning model that combines deep neural networks (DNNs) and random forests (RFs) using a weighted average approach for genomic prediction (Fig. 1). RFs leveraged special advantages for genomic data over other machine learning models. Unlike methods like XGBoost (which can overfit small datasets by repeatedly correcting errors), RF reduced overfitting in two ways 1) by bootstrap aggregation (bagging) and 2) by random feature selection. In bagging, RFs build each decision tree on a different random subset of the data (with replacement). This introduced variability among the trees, reducing the likelihood of the model overfitting noise in the training data and thereby enhancing its ability to generalize to unseen data. 
-
- 
+BreedSight is an ensemble machine learning model that combines deep neural networks (DNNs) and random forests (RFs) using a weighted average approach for genomic prediction. RFs leveraged special advantages for genomic data over other machine learning models. Unlike methods like XGBoost (which can overfit small datasets by repeatedly correcting errors), RF reduced overfitting in two ways 1) by bootstrap aggregation (bagging) and 2) by random feature selection. In bagging, RFs build each decision tree on a different random subset of the data (with replacement). This introduced variability among the trees, reducing the likelihood of the model overfitting noise in the training data and thereby enhancing its ability to generalize to unseen data. 
 
 **Random Feature Selection** 
 
