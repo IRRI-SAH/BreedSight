@@ -506,7 +506,7 @@ def run_cross_validation(training_file, training_additive_file, testing_file, te
         testing_additive=testing_additive,
         epochs=100,  # Reasonable number for demonstration
         batch_size=64,
-        learning_rate=learning_rate,
+        #learning_rate=learning_rate,
         feature_selection=feature_selection,
         outer_n_splits=10
     )
