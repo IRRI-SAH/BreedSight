@@ -17,7 +17,7 @@ results = run_cross_validation(
     testing_file=testing_file_path,
     testing_additive_file=testing_additive_file_path,
     feature_selection=True,
-    learning_rate=0.001
+    #learning_rate=0.001
 )
 
 # Unpack the returned tuple
