@@ -526,7 +526,7 @@ def KFoldCrossValidation(training_data, training_additive, val_data=None, val_ad
         rf_path = None
         if save_models:
             os.makedirs(model_dir, exist_ok=True)
-            model_path = os.path.join(model_dir, f'deepmap_fold_{outer_fold}.h5')
+            model_path = os.path.join(model_dir, f'BreedSight_fold_{outer_fold}.h5')
             rf_path = os.path.join(model_dir, f'rf_fold_{outer_fold}.joblib')
         
         # Target scaling - fit only on training data
@@ -655,7 +655,7 @@ def KFoldCrossValidation(training_data, training_additive, val_data=None, val_ad
         final_model_path = None
         final_rf_path = None
         if save_models:
-            final_model_path = os.path.join(model_dir, 'deepmap_final.h5')
+            final_model_path = os.path.join(model_dir, 'BreedSight_final.h5')
             final_rf_path = os.path.join(model_dir, 'rf_final.joblib')
 
         _, _, pred_test_scaled, final_history, _ = BreedSightTuning(
