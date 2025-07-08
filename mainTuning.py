@@ -6,10 +6,10 @@ from BreedSightTuning import run_cross_validation
 
 def main():
     # Define file paths
-    training_file_path = "C:/Users/Dr Niranjani/Desktop/BreedSight-main/Example_files/training_phenotypic_data.csv"
-    training_additive_file_path = "C:/Users/Dr Niranjani/Desktop/BreedSight-main/Example_files/training_additive.csv"
-    testing_file_path = "C:/Users/Dr Niranjani/Desktop/BreedSight-main/Example_files/testing_data.csv"
-    testing_additive_file_path = "C:/Users/Dr Niranjani/Desktop/BreedSight-main/Example_files/testing_additive.csv"
+    training_file_path = "C:/Users/Ashmitha/Desktop/BreedSight-main/Example_files/training_phenotypic_data.csv"
+    training_additive_file_path = "C:/Users/Ashmitha/Desktop/BreedSight-main/Example_files/training_additive.csv"
+    testing_file_path = "C:/Users/Ashmitha/Desktop/BreedSight-main/Example_files/testing_data.csv"
+    testing_additive_file_path = "C:/Users/Ashmitha/Desktop/BreedSight-main/Example_files/testing_additive.csv"
 
     try:
         # Run cross-validation
