@@ -83,18 +83,7 @@ def main():
             else:
                 print(f"Unsupported plot type for {plot_name}: {type(plot)}")
 
-        # Based on typical machine learning workflows, we'll assume the following order:
-        # 0: train_predictions
-        # 1: val_predictions
-        # 2: test_predictions
-        # 3: feature_importances
-        # 4: results_summary
-        # 5: train_plot
-        # 6: val_plot
-        # 7: test_plot
-        # 8: train_additional
-        # 9: val_additional
-        # 10: test_additional
+        
 
         # Save prediction files
         if len(results) > 0:
@@ -108,18 +97,18 @@ def main():
         if len(results) > 2:
             save_data(results[2], "test_predictions")
         
-        if len(results) > 3:
-            save_data(results[3], "feature_importances")
+       # if len(results) > 3:
+           # save_data(results[3], "feature_importances")
         
-        if len(results) > 4:
-            save_data(results[4], "results_summary")
+       # if len(results) > 4:
+          #  save_data(results[4], "results_summary")
 
         # Handle plots
-        if len(results) > 5:
-            handle_plot(results[5], "train_plot")
+      #  if len(results) > 5:
+           # handle_plot(results[5], "train_plot")
         
-        if len(results) > 6:
-            handle_plot(results[6], "val_plot")
+      #  if len(results) > 6:
+          #  handle_plot(results[6], "val_plot")
         
         if len(results) > 7:
             handle_plot(results[7], "test_plot")
