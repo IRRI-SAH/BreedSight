@@ -5,7 +5,7 @@ Created on Sun Jun 29 18:52:23 2025
 @author: Ashmitha
 """
 
-#############################Required Package####################################
+############################# Required Packages ####################################
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -22,55 +22,57 @@ from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 import tempfile
 import os
-from sklearn.model_selection import train_test_split
-###################Seed default#################
-RANDOM_STATE = 60 
-##########################Model Initialization#############
-# User can change the number of layers and neurons accordingly 
 
-def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None, 
-            epochs=1000, batch_size=64, learning_rate=0.0001, 
-            l2_reg=0.001, dropout_rate=0.5, 
-            rf_n_estimators=200, rf_max_depth=30, 
-            alpha=0.5, verbose=1):
+################### Seed Default #################
+RANDOM_STATE = 60
+
+########################## Model Initialization #############
+
+def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
+              epochs=1000, batch_size=64, learning_rate=0.0001,
+              l2_reg=0.001, dropout_rate=0.5,
+              rf_n_estimators=200, rf_max_depth=30,
+              alpha=0.5, verbose=1, target_scaler=None):
     
     # Initialize results
     predicted_test = None
     
     # -------------------------------- Feature Scaling
-    # Only fit on training data, transform others
     feature_scaler = StandardScaler()
     trainX_scaled = feature_scaler.fit_transform(trainX)
     valX_scaled = feature_scaler.transform(valX) if valX is not None else None
     testX_scaled = feature_scaler.transform(testX) if testX is not None else None
     
     # -------------------------------- Target Scaling
-    # Only fit on training data, transform others
-    target_scaler = StandardScaler()
-    trainy_scaled = target_scaler.fit_transform(trainy.reshape(-1, 1)).flatten()
+    if target_scaler is None:
+        target_scaler = StandardScaler()
+        trainy_scaled = target_scaler.fit_transform(trainy.reshape(-1, 1)).flatten()
+    else:
+        trainy_scaled = target_scaler.transform(trainy.reshape(-1, 1)).flatten()
+    
     valy_scaled = target_scaler.transform(valy.reshape(-1, 1)).flatten() if valy is not None else None
     testy_scaled = target_scaler.transform(testy.reshape(-1, 1)).flatten() if testy is not None else None
     
     # -------------------------------- Build DNN Model
     def build_dnn_model(input_shape):
-        inputs = tf.keras.Input(shape=(input_shape,))   
-        x = Dense(512, kernel_initializer='he_normal', 
-                 kernel_regularizer=regularizers.l2(l2_reg))(inputs)
+        inputs = tf.keras.Input(shape=(input_shape,))
+        x = Dense(512, kernel_initializer='he_normal',
+                  kernel_regularizer=regularizers.l2(l2_reg))(inputs)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
         
         # First residual block
         res = x
-        x = Dense(64, kernel_initializer='he_normal', 
-                 kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Dense(64, kernel_initializer='he_normal',
+                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
-        x = LeakyReLU(alpha=0.1)(x)   
+        x = LeakyReLU(alpha=0.1)(x)
         
         if res.shape[-1] != x.shape[-1]:
-            res = Dense(64, kernel_initializer='he_normal', 
-                       kernel_regularizer=regularizers.l2(l2_reg))(res)
+            res = Dense(64, kernel_initializer='he_normal',
+                        kernel_regularizer=regularizers.l2(l2_reg))(res)
         x = Add()([x, res])
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
@@ -78,72 +80,68 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         
         # Second residual block
         res = x
-        x = Dense(16, kernel_initializer='he_normal', 
-                 kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Dense(16, kernel_initializer='he_normal',
+                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
-        x = LeakyReLU(alpha=0.1)(x)   
+        x = LeakyReLU(alpha=0.1)(x)
         
         if res.shape[-1] != x.shape[-1]:
-            res = Dense(16, kernel_initializer='he_normal', 
-                       kernel_regularizer=regularizers.l2(l2_reg))(res)
+            res = Dense(16, kernel_initializer='he_normal',
+                        kernel_regularizer=regularizers.l2(l2_reg))(res)
         x = Add()([x, res])
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
 
         # Final layers
-        x = Dense(8, kernel_initializer='he_normal', 
-                 kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Dense(8, kernel_initializer='he_normal',
+                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
 
-        x = Dense(4, kernel_initializer='he_normal', 
-                 kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Dense(4, kernel_initializer='he_normal',
+                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
         
-        outputs = Dense(1, activation="relu")(x) #change to linear if required#
+        outputs = Dense(1, activation="linear")(x)
         model = tf.keras.Model(inputs, outputs)
         
-        model.compile(loss=tf.keras.losses.Huber(delta=0.1), 
-                     optimizer=Adam(learning_rate=learning_rate, clipvalue=0.1), 
-                     metrics=['mse'])
+        model.compile(loss=tf.keras.losses.Huber(delta=0.1),
+                      optimizer=Adam(learning_rate=learning_rate, clipvalue=0.1),
+                      metrics=['mse'])
         return model
     
     dnn_model = build_dnn_model(trainX.shape[1])
     
     # -------------------------------- Train DNN Model
-    ""' un comment this if the model is overfitting ""'
-    #callbacks = [
-       # EarlyStopping(monitor='val_loss', verbose=verbose, 
-                    # restore_best_weights=True, patience=20)
-   # ]
+    callbacks = [
+        EarlyStopping(monitor='val_loss', verbose=verbose,
+                      restore_best_weights=True, patience=20)
+    ]
     
     if valX is not None and valy is not None:
         validation_data = (valX_scaled, valy_scaled)
-        validation_split = 0.0
     else:
         validation_data = None
-        validation_split = 0.05
     
     history = dnn_model.fit(
-        trainX_scaled, 
-        trainy_scaled, 
-        epochs=epochs, 
-        batch_size=batch_size, 
+        trainX_scaled,
+        trainy_scaled,
+        epochs=epochs,
+        batch_size=batch_size,
         validation_data=validation_data,
-        validation_split=validation_split,
-        verbose=verbose, 
-        #callbacks=callbacks
+        verbose=verbose,
+        callbacks=callbacks
     )
     
     # -------------------------------- Train Random Forest Model
     rf_model = RandomForestRegressor(
-        n_estimators=rf_n_estimators, 
-        max_depth=rf_max_depth, 
+        n_estimators=rf_n_estimators,
+        max_depth=rf_max_depth,
         random_state=RANDOM_STATE,
         n_jobs=-1
     )
@@ -158,7 +156,7 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
     predicted_val_rf = rf_model.predict(valX) if valX is not None else None
     predicted_test_rf = rf_model.predict(testX) if testX is not None else None
     
-    # Inverse transform to get predictions back to original scale
+    # Inverse transform predictions
     predicted_train_dnn = target_scaler.inverse_transform(
         predicted_train_dnn_scaled.reshape(-1, 1)).flatten()
     predicted_val_dnn = target_scaler.inverse_transform(
@@ -175,15 +173,16 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         print("\n=== Training Summary ===")
         print(f"Train samples: {len(trainX)}, Validation samples: {len(valX) if valX is not None else 'N/A'}")
         
-    return predicted_train, predicted_val, predicted_test, history, rf_model
+    return predicted_train, predicted_val, predicted_test, history, rf_model, target_scaler
 
-def compute_genomic_features(X, ref_features=None, is_train=False):
+def compute_genomic_features(X, trainX=None, ref_features=None, is_train=False):
     """
-    Compute genomic relationship features without data leakage
+    Compute genomic relationship features with strict separation to prevent leakage
     
     Parameters:
     -----------
     X: Input genomic data
+    trainX: Training genomic data (required for non-training data)
     ref_features: Reference features from training data (None for training data)
     is_train: Boolean indicating if this is training data
     
@@ -193,52 +192,46 @@ def compute_genomic_features(X, ref_features=None, is_train=False):
     ref_features: Dictionary of reference statistics (if is_train=True)
     """
     if is_train and ref_features is None:
-        # For training data when no reference provided
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         n_markers = X_scaled.shape[1]
         
-        # Compute relationship matrices for training data only
+        # Compute genomic relationship matrix for training data
         G_train = np.dot(X_scaled, X_scaled.T) / n_markers
         I_train = G_train * G_train
         
-        # Store reference statistics
         mean_diag = np.mean(np.diag(I_train))
-        I_train_norm = I_train / mean_diag
+        I_train_norm = I_train / mean_diag if mean_diag != 0 else I_train
         
-        # Combine features
-        X_final = np.concatenate([G_train, I_train_norm], axis=1)
+        X_final = np.concatenate([X_scaled, I_train_norm], axis=1)
         
-        # Store reference info for validation/test
         ref_features = {
             'scaler': scaler,
             'mean_diag': mean_diag,
             'X_train_scaled': X_scaled
         }
         
-    elif not is_train and ref_features is not None:
-        # For validation/test data with reference features
+    elif not is_train and ref_features is not None and trainX is not None:
         X_scaled = ref_features['scaler'].transform(X)
-        n_markers = X_scaled.shape[1]
+        n_markers = ref_features['X_train_scaled'].shape[1]
         
         # Compute relationship with training samples only
         G_val = np.dot(X_scaled, ref_features['X_train_scaled'].T) / n_markers
         I_val = G_val * G_val
         
-        # Normalize using training statistics
-        I_val_norm = I_val / ref_features['mean_diag']
+        I_val_norm = I_val / ref_features['mean_diag'] if ref_features['mean_diag'] != 0 else I_val
         
-        # Construct features
-        X_final = np.concatenate([G_val, I_val_norm], axis=1)
+        # Use original scaled features for consistency
+        X_final = np.concatenate([X_scaled, I_val_norm], axis=1)
     
     else:
-        raise ValueError("Invalid combination of is_train and ref_features parameters")
+        raise ValueError("Invalid combination of is_train, trainX, and ref_features parameters")
     
     return X_final, ref_features
 
 def calculate_metrics(true_values, predicted_values):
     """Compute performance metrics between true and predicted values"""
-    mask = ~np.isnan(predicted_values)
+    mask = ~np.isnan(predicted_values) & ~np.isnan(true_values)
     if np.sum(mask) == 0:
         return np.nan, np.nan, np.nan, np.nan
     true_values = true_values[mask]
@@ -247,13 +240,13 @@ def calculate_metrics(true_values, predicted_values):
     mse = mean_squared_error(true_values, predicted_values)
     rmse = np.sqrt(mse)
     r2 = r2_score(true_values, predicted_values)
-    corr = pearsonr(true_values, predicted_values)[0]
+    corr, _ = pearsonr(true_values, predicted_values)
     return mse, rmse, corr, r2
 
 def KFoldCrossValidation(training_data, training_additive, testing_data, testing_additive,
-                        epochs=1000, learning_rate=0.001, batch_size=64,
+                        epochs=1000, learning_rate=0.0001, batch_size=64,
                         outer_n_splits=10, output_file='cross_validation_results.csv',
-                        train_pred_file='train_predictions.csv', 
+                        train_pred_file='train_predictions.csv',
                         val_pred_file='validation_predictions.csv',
                         test_pred_file='test_predictions.csv',
                         feature_selection=True):
@@ -270,6 +263,10 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
     training_additive_raw = training_additive.iloc[:, 1:].values
     testing_additive_raw = testing_additive.iloc[:, 1:].values
     phenotypic_info = training_data['phenotypes'].values
+    
+    # Fit target scaler once on training data
+    target_scaler = StandardScaler()
+    phenotypic_info_scaled = target_scaler.fit_transform(phenotypic_info.reshape(-1, 1)).flatten()
     
     has_test_phenotypes = 'phenotypes' in testing_data.columns
     phenotypic_test_info = testing_data['phenotypes'].values if has_test_phenotypes else None
@@ -290,15 +287,20 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
         outer_trainy = phenotypic_info[outer_train_index]
         outer_valy = phenotypic_info[outer_val_index]
         
+        # Use pre-fitted target scaler
+        outer_trainy_scaled = target_scaler.transform(outer_trainy.reshape(-1, 1)).flatten()
+        outer_valy_scaled = target_scaler.transform(outer_valy.reshape(-1, 1)).flatten()
+        
         # Process features without leakage
         X_train_genomic, ref_features = compute_genomic_features(
-            outer_trainX, 
+            outer_trainX,
             ref_features=None,
             is_train=True
         )
         
         X_val_genomic, _ = compute_genomic_features(
-            outer_valX, 
+            outer_valX,
+            trainX=outer_trainX,
             ref_features=ref_features,
             is_train=False
         )
@@ -306,7 +308,7 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
         # Feature selection without leakage
         if feature_selection:
             selector = SelectFromModel(
-                RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE), 
+                RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE),
                 threshold="mean"
             )
             selector.fit(X_train_genomic, outer_trainy)
@@ -317,17 +319,18 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
             X_val_final = X_val_genomic
             
         # Model training
-        pred_train, pred_val, _, history, _ = BreedSight(
-            trainX=X_train_final, 
+        pred_train, pred_val, _, history, _, target_scaler = BreedSight(
+            trainX=X_train_final,
             trainy=outer_trainy,
             valX=X_val_final,
             valy=outer_valy,
             testX=None,
             testy=None,
-            epochs=1000, 
-            batch_size=batch_size, 
+            epochs=epochs,
+            batch_size=batch_size,
             learning_rate=learning_rate,
-            verbose=1
+            verbose=1,
+            target_scaler=target_scaler
         )
         
         # Store predictions
@@ -357,29 +360,30 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
             'Val_R2': r2_val, 'Val_Corr': corr_val
         })
     
-    # -------------------------------- FINAL MODEL TRAINING
-    print("\n==============================Training Final model on ALL training data")
+    # -------------------------------- Final Model Training
+    print("\n=== Training Final Model on ALL Training Data ===")
     
     # Process ALL training data
     X_train_raw = training_additive_raw
     y_train_raw = phenotypic_info
-
+    
     # Feature processing
     X_train_genomic, ref_features = compute_genomic_features(
-        X_train_raw, 
-        ref_features=None, 
+        X_train_raw,
+        ref_features=None,
         is_train=True
     )
     X_test_genomic, _ = compute_genomic_features(
-        testing_additive_raw, 
-        ref_features=ref_features, 
+        testing_additive_raw,
+        trainX=X_train_raw,
+        ref_features=ref_features,
         is_train=False
     )
 
     # Feature selection
     if feature_selection:
         selector = SelectFromModel(
-            RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE), 
+            RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE),
             threshold="1.25*median"
         )
         selector.fit(X_train_genomic, y_train_raw)
@@ -390,17 +394,18 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
         X_test_final = X_test_genomic
 
     # Train final model
-    _, _, pred_test_final, _, _ = BreedSight(
-        trainX=X_train_final, 
+    _, _, pred_test_final, _, _, target_scaler = BreedSight(
+        trainX=X_train_final,
         trainy=y_train_raw,
         valX=None,
         valy=None,
         testX=X_test_final,
         testy=phenotypic_test_info if has_test_phenotypes else None,
-        epochs=100,  # Fixed epoch count
+        epochs=100,
         batch_size=batch_size,
         learning_rate=learning_rate,
-        verbose=1
+        verbose=1,
+        target_scaler=target_scaler
     )
     
     # Create final test predictions
@@ -440,49 +445,53 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
     
     # -------------------------------- Generate Plots
     def generate_plot(true_vals, pred_vals, title, is_test=False):
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(10, 6), dpi=300)
+        plt.style.use('ggplot')  # Changed from 'seaborn' to 'ggplot'
+        
         if is_test and not has_test_phenotypes:
             pred_values = pred_vals.dropna()
             if len(pred_values) > 0:
-                plt.hist(pred_values, bins=30)
-                plt.xlabel('Predicted Phenotype')
-                plt.ylabel('Frequency')
+                plt.hist(pred_values, bins=30, color='skyblue', edgecolor='black')
+                plt.xlabel('Predicted Phenotype', fontsize=12)
+                plt.ylabel('Frequency', fontsize=12)
             else:
-                plt.text(0.5, 0.5, 'No valid predictions', ha='center', va='center')
+                plt.text(0.5, 0.5, 'No valid predictions', ha='center', va='center', fontsize=12)
         else:
             valid_mask = (~pd.isna(pred_vals)) & (~pd.isna(true_vals))
             if valid_mask.any():
-                plt.scatter(true_vals[valid_mask], pred_vals[valid_mask], alpha=0.5)
-                plt.xlabel('True Phenotype')
-                plt.ylabel('Predicted Phenotype')
+                plt.scatter(true_vals[valid_mask], pred_vals[valid_mask], alpha=0.5, color='blue')
+                plt.xlabel('True Phenotype', fontsize=12)
+                plt.ylabel('Predicted Phenotype', fontsize=12)
                 coef = np.polyfit(true_vals[valid_mask], pred_vals[valid_mask], 1)
                 poly1d_fn = np.poly1d(coef)
-                plt.plot(true_vals[valid_mask], poly1d_fn(true_vals[valid_mask]), '--k')
+                plt.plot(true_vals[valid_mask], poly1d_fn(true_vals[valid_mask]), '--k', linewidth=2)
+                plt.grid(True, linestyle='--', alpha=0.7)
             else:
-                plt.text(0.5, 0.5, 'No valid predictions', ha='center', va='center')
+                plt.text(0.5, 0.5, 'No valid predictions', ha='center', va='center', fontsize=12)
         
-        plt.title(title)
+        plt.title(title, fontsize=14)
+        plt.tight_layout()
         plot_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False).name
-        plt.savefig(plot_file)
+        plt.savefig(plot_file, dpi=300)
         plt.close()
         return plot_file
     
-    plot_files_train = [generate_plot(train_pred_df['True_Phenotype'], 
-                                    train_pred_df['Predicted_Phenotype'], 
+    plot_files_train = [generate_plot(train_pred_df['True_Phenotype'],
+                                    train_pred_df['Predicted_Phenotype'],
                                     'Training Set Predictions')]
     
-    plot_files_val = [generate_plot(val_pred_df['True_Phenotype'], 
-                                  val_pred_df['Predicted_Phenotype'], 
+    plot_files_val = [generate_plot(val_pred_df['True_Phenotype'],
+                                  val_pred_df['Predicted_Phenotype'],
                                   'Validation Set Predictions')]
     
     plot_files_test = [generate_plot(test_pred_final_df.get('True_Phenotype', None),
                                    test_pred_final_df['Predicted_Phenotype'],
-                                   'Test Set Predictions (Final Model)', 
+                                   'Test Set Predictions (Final Model)',
                                    is_test=True)]
     
     return results_df, train_pred_df, val_pred_df, test_pred_final_df, plot_files_train, plot_files_val, plot_files_test
 
-def run_cross_validation(training_file, training_additive_file, testing_file, testing_additive_file, 
+def run_cross_validation(training_file, training_additive_file, testing_file, testing_additive_file,
                         feature_selection=True, learning_rate=0.0001, **kwargs):
     """
     Run cross-validation with the fixed model that prevents data leakage
@@ -504,9 +513,9 @@ def run_cross_validation(training_file, training_additive_file, testing_file, te
         training_additive=training_additive,
         testing_data=testing_data,
         testing_additive=testing_additive,
-        epochs=100,  # Reasonable number for demonstration
+        epochs=100,
         batch_size=64,
-        #learning_rate=learning_rate,
+        learning_rate=learning_rate,
         feature_selection=feature_selection,
         outer_n_splits=10
     )
@@ -522,9 +531,9 @@ def run_cross_validation(training_file, training_additive_file, testing_file, te
     test_csv = save_to_temp(test_pred, "test")
     
     return (
-        train_pred,  # train_output
-        val_pred,    # val_output
-        test_pred,   # test_output
+        train_pred,
+        val_pred,
+        test_pred,
         train_plot[0] if train_plot else None,
         val_plot[0] if val_plot else None,
         test_plot[0] if test_plot else None,
