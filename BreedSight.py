@@ -34,6 +34,12 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
               rf_n_estimators=200, rf_max_depth=30,
               alpha=0.5, verbose=1, target_scaler=None):
     
+    # Check for overlap between train and validation sets if indices available
+    if valX is not None and valy is not None:
+        if hasattr(trainX, 'index') and hasattr(valX, 'index'):
+            if not set(trainX.index).isdisjoint(set(valX.index)):
+                raise ValueError("Training and validation sets contain overlapping samples")
+    
     # Initialize results
     predicted_test = None
     
@@ -145,16 +151,16 @@ def BreedSight(trainX, trainy, valX=None, valy=None, testX=None, testy=None,
         random_state=RANDOM_STATE,
         n_jobs=-1
     )
-    rf_model.fit(trainX, trainy.ravel())
+    rf_model.fit(trainX_scaled, trainy.ravel())  # Use scaled features for consistency
     
     # -------------------------------- Make Predictions
     predicted_train_dnn_scaled = dnn_model.predict(trainX_scaled).flatten()
     predicted_val_dnn_scaled = dnn_model.predict(valX_scaled).flatten() if valX is not None else None
     predicted_test_dnn_scaled = dnn_model.predict(testX_scaled).flatten() if testX is not None else None
     
-    predicted_train_rf = rf_model.predict(trainX)
-    predicted_val_rf = rf_model.predict(valX) if valX is not None else None
-    predicted_test_rf = rf_model.predict(testX) if testX is not None else None
+    predicted_train_rf = rf_model.predict(trainX_scaled)  # Use scaled
+    predicted_val_rf = rf_model.predict(valX_scaled) if valX is not None else None
+    predicted_test_rf = rf_model.predict(testX_scaled) if testX is not None else None
     
     # Inverse transform predictions
     predicted_train_dnn = target_scaler.inverse_transform(
@@ -191,6 +197,12 @@ def compute_genomic_features(X, trainX=None, ref_features=None, is_train=False):
     X_final: Transformed features
     ref_features: Dictionary of reference statistics (if is_train=True)
     """
+    # Handle missing values
+    if np.any(np.isnan(X)):
+        from sklearn.impute import SimpleImputer
+        imputer = SimpleImputer(strategy='mean')
+        X = imputer.fit_transform(X) if is_train else imputer.transform(X)
+    
     if is_train and ref_features is None:
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
@@ -259,14 +271,16 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
     test_ids = set(testing_data.iloc[:, 0].values)
     assert len(train_ids & test_ids) == 0, "Training and testing sets must be distinct"
     
+    # Verify no overlap in features
+    train_features = training_additive.iloc[:, 1:].values
+    test_features = testing_additive.iloc[:, 1:].values
+    if np.any([np.array_equal(train_row, test_row) for train_row in train_features for test_row in test_features]):
+        raise ValueError("Training and testing feature sets contain identical rows")
+    
     # -------------------------------- Data Preparation
     training_additive_raw = training_additive.iloc[:, 1:].values
     testing_additive_raw = testing_additive.iloc[:, 1:].values
     phenotypic_info = training_data['phenotypes'].values
-    
-    # Fit target scaler once on training data
-    target_scaler = StandardScaler()
-    phenotypic_info_scaled = target_scaler.fit_transform(phenotypic_info.reshape(-1, 1)).flatten()
     
     has_test_phenotypes = 'phenotypes' in testing_data.columns
     phenotypic_test_info = testing_data['phenotypes'].values if has_test_phenotypes else None
@@ -287,8 +301,9 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
         outer_trainy = phenotypic_info[outer_train_index]
         outer_valy = phenotypic_info[outer_val_index]
         
-        # Use pre-fitted target scaler
-        outer_trainy_scaled = target_scaler.transform(outer_trainy.reshape(-1, 1)).flatten()
+        # Fit target scaler for this fold
+        target_scaler = StandardScaler()
+        outer_trainy_scaled = target_scaler.fit_transform(outer_trainy.reshape(-1, 1)).flatten()
         outer_valy_scaled = target_scaler.transform(outer_valy.reshape(-1, 1)).flatten()
         
         # Process features without leakage
@@ -309,7 +324,7 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
         if feature_selection:
             selector = SelectFromModel(
                 RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE),
-                threshold="mean"
+                threshold="1.25*median"  # Consistent with final model
             )
             selector.fit(X_train_genomic, outer_trainy)
             X_train_final = selector.transform(X_train_genomic)
@@ -366,6 +381,10 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
     # Process ALL training data
     X_train_raw = training_additive_raw
     y_train_raw = phenotypic_info
+    
+    # Fit target scaler on entire training for final model
+    target_scaler = StandardScaler()
+    y_train_raw_scaled = target_scaler.fit_transform(y_train_raw.reshape(-1, 1)).flatten()
     
     # Feature processing
     X_train_genomic, ref_features = compute_genomic_features(
