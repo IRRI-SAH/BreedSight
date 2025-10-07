@@ -920,38 +920,33 @@ def tune_hyperparameters(outer_train_data, outer_train_additive, param_grid,
 ###################################################### Running cross validation ##########################################
 
 def run_cross_validation(training_file, training_additive_file, testing_file=None, testing_additive_file=None, 
-                        feature_selection=True, outer_n_splits=2, inner_n_splits=2): # increase outer_n_splits=10 and inner_n_splits=5
+                        feature_selection=True, outer_n_splits=10, inner_n_splits=5):
     """
-    Main function to run cross-validation with hyperparameter tuning
-    Now accepts both file paths (strings) and Gradio File objects
+    Main function to run nested cross-validation with hyperparameter tuning
+    
+    Args:
+        training_file: Path to training data CSV or Gradio File object
+        training_additive_file: Path to training additive data CSV or Gradio File object
+        testing_file: Path to testing data CSV or Gradio File object (optional)
+        testing_additive_file: Path to testing additive data CSV or Gradio File object (optional)
+        feature_selection: Whether to perform feature selection
+        outer_n_splits: Number of outer CV folds (default: 10)
+        inner_n_splits: Number of inner CV folds (default: 5)
     
     Returns:
-        Tuple containing:
-        - train_predictions (DataFrame)
-        - val_predictions (DataFrame)
-        - test_predictions (DataFrame or None)
-        - train_plot (matplotlib figure)
-        - val_plot (matplotlib figure)
-        - test_plot (matplotlib figure or None)
-        - train_csv (file path)
-        - val_csv (file path)
-        - test_csv (file path or None)
-        - tuning_results_df (DataFrame)
+        Tuple of (train_predictions, val_predictions, test_predictions, train_plot, val_plot, test_plot, 
+                  train_csv, val_csv, test_csv, tuning_results_df, feature_importance_df)
     """
-    # Validate and load data
     if not all([training_file, training_additive_file]):
         raise ValueError("At least training files must be provided")
     
     try:
-        # Helper function to handle both file paths and Gradio File objects
         def get_path(file_obj):
             return file_obj.name if hasattr(file_obj, 'name') else file_obj
         
-        # Read files
         training_data = pd.read_csv(get_path(training_file))
         training_additive = pd.read_csv(get_path(training_additive_file))
         
-        # Check if test files were provided
         has_test_data = testing_file is not None and testing_additive_file is not None
         if has_test_data:
             testing_data = pd.read_csv(get_path(testing_file))
@@ -963,7 +958,6 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
     except Exception as e:
         raise ValueError(f"Error reading CSV files: {e}")
 
-    # Data validation checks
     if 'phenotypes' not in training_data.columns:
         raise ValueError("Training data must contain 'phenotypes' column")
     if training_data.shape[0] != training_additive.shape[0]:
@@ -974,19 +968,27 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         if training_additive.shape[1] != testing_additive.shape[1]:
             raise ValueError("Mismatch in number of features between training and testing additive data")
 
-    # Hyperparameter tuning grid
+    validate_sample_ids(training_data, "training data")
+    if has_test_data:
+        validate_sample_ids(testing_data, "testing data")
+        train_ids = set(training_data.iloc[:, 0].values)
+        test_ids = set(testing_data.iloc[:, 0].values)
+        overlap = train_ids & test_ids
+        if overlap:
+            raise ValueError(f"Data leakage: {len(overlap)} samples appear in both training and testing sets")
+
     param_grid = {
-        'learning_rate': [0.0001, 0.001, 0.01], # adjust this Hyperparameter tuning grid
-        'batch_size': [32, 64, 128],
-        'dropout_rate': [0.3, 0.5, 0.7],
-        'rf_n_estimators': [100, 200, 300]
+        'learning_rate': [0.00005, 0.0001, 0.0005, 0.001, 0.005],
+        'batch_size': [16, 32, 64, 128],
+        'dropout_rate': [0.2, 0.3, 0.4, 0.5],
+        'rf_n_estimators': [100, 200, 300, 400]
     }
 
-    # Now perform proper nested CV: Tune inside each outer fold
     outer_kf = KFold(n_splits=outer_n_splits, shuffle=True, random_state=RANDOM_STATE)
     outer_results = []
     train_predictions = []
     val_predictions = []
+    feature_importances = []
     
     training_additive_raw = training_additive.iloc[:, 1:].values
     phenotypic_info = training_data['phenotypes'].values
@@ -995,13 +997,11 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
     for outer_fold, (outer_train_idx, outer_val_idx) in enumerate(outer_kf.split(training_additive_raw), 1):
         print(f"\n=== Outer Fold {outer_fold}/{outer_n_splits} ===")
         
-        # Split data for outer fold
         outer_train_data = training_data.iloc[outer_train_idx]
         outer_train_additive = training_additive.iloc[outer_train_idx]
         outer_val_data = training_data.iloc[outer_val_idx]
         outer_val_additive = training_additive.iloc[outer_val_idx]
         
-        # Run hyperparameter tuning on outer train split only
         best_params, tuning_results_fold = tune_hyperparameters(
             outer_train_data=outer_train_data,
             outer_train_additive=outer_train_additive,
@@ -1010,8 +1010,6 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             inner_n_splits=inner_n_splits
         )
         
-        # Now train and evaluate on outer val with best params
-        # Compute genomic features for outer training data
         X_outer_train_genomic, ref_features = compute_genomic_features(
             outer_train_additive.iloc[:, 1:].values, 
             sample_ids=outer_train_data.iloc[:, 0].values, 
@@ -1020,7 +1018,6 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         )
         y_outer_train = outer_train_data['phenotypes'].values
         
-        # Compute genomic features for outer validation data
         X_outer_val_genomic, _ = compute_genomic_features(
             outer_val_additive.iloc[:, 1:].values,
             sample_ids=outer_val_data.iloc[:, 0].values,
@@ -1030,7 +1027,6 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         )
         y_outer_val = outer_val_data['phenotypes'].values
         
-        # Feature selection on outer train
         if feature_selection:
             selector = SelectFromModel(
                 RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE + outer_fold), 
@@ -1040,22 +1036,31 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             selected_features = selector.get_support()
             
             if np.sum(selected_features) == 0:
-                print("Warning: No features selected in outer fold, using all features")
+                print(f"Warning: No features selected in outer fold {outer_fold}, using all features")
                 X_outer_train_selected = X_outer_train_genomic
                 X_outer_val_selected = X_outer_val_genomic
             else:
                 X_outer_train_selected = selector.transform(X_outer_train_genomic)
                 X_outer_val_selected = selector.transform(X_outer_val_genomic)
+                
+            if hasattr(selector.estimator_, 'feature_importances_'):
+                feature_importances.append({
+                    'fold': outer_fold,
+                    'importances': selector.estimator_.feature_importances_,
+                    'selected_features': selected_features
+                })
         else:
             X_outer_train_selected = X_outer_train_genomic
             X_outer_val_selected = X_outer_val_genomic
         
-        # Target scaling for outer fold
         target_scaler = StandardScaler()
         y_outer_train_scaled = target_scaler.fit_transform(y_outer_train.reshape(-1, 1)).flatten()
         y_outer_val_scaled = target_scaler.transform(y_outer_val.reshape(-1, 1)).flatten()
         
-        # Train final model for this outer fold with best params
+        model_path = os.path.join('saved_models', f'BreedSight_fold_{outer_fold}.h5')
+        rf_path = os.path.join('saved_models', f'rf_fold_{outer_fold}.joblib')
+        os.makedirs('saved_models', exist_ok=True)
+        
         pred_train_scaled, pred_val_scaled, _, _, _ = BreedSightTuning(
             trainX=X_outer_train_selected, 
             trainy=y_outer_train_scaled,
@@ -1071,14 +1076,14 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             rf_n_estimators=best_params['rf_n_estimators'],
             rf_max_depth=42,
             alpha=0.6,
-            verbose=1
+            verbose=1,
+            model_save_path=model_path,
+            rf_save_path=rf_path
         )
         
-        # Inverse transform
         pred_train = target_scaler.inverse_transform(pred_train_scaled.reshape(-1, 1)).flatten()
         pred_val = target_scaler.inverse_transform(pred_val_scaled.reshape(-1, 1)).flatten()
         
-        # Store predictions
         train_predictions.append(pd.DataFrame({
             'Sample_ID': outer_train_data.iloc[:, 0],
             'True_Phenotype': y_outer_train,
@@ -1093,7 +1098,6 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             'Fold': outer_fold
         }))
         
-        # Calculate metrics
         mse_val, rmse_val, corr_val, r2_val = calculate_metrics(y_outer_val, pred_val)
         
         outer_results.append({
@@ -1104,15 +1108,23 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             'outer_fold': outer_fold,
             'n_features': X_outer_train_selected.shape[1]
         })
-    
-    # Final model on full training if test provided
-    test_pred_final_df = pd.DataFrame()
-    if has_test_data:
-        # Use average or most frequent best params across folds (simple: take last)
-        best_params = outer_results[-1]['params']  # Or implement voting
         
-        # Train on full training, evaluate on test
-        # Similar to before, but with best_params
+        print(f"Fold {outer_fold} Results:")
+        print(f"  Validation: R² = {r2_val:.4f}, Corr = {corr_val:.4f}, RMSE = {rmse_val:.4f}")
+    
+    test_pred_final_df = pd.DataFrame()
+    final_model_metrics = {}
+    
+    if has_test_data:
+        print("\n=== Training Final Model on ALL Training Data ===")
+        
+        param_counts = {}
+        for result in outer_results:
+            param_tuple = tuple(sorted(result['params'].items()))
+            param_counts[param_tuple] = param_counts.get(param_tuple, 0) + 1
+        best_params_tuple = max(param_counts, key=param_counts.get)
+        best_params = dict(best_params_tuple)
+        
         X_train_genomic, ref_features = compute_genomic_features(
             training_additive_raw, 
             sample_ids=train_sample_ids,
@@ -1130,11 +1142,17 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         )
         
         if feature_selection:
+            print("Performing final feature selection...")
             final_selector = SelectFromModel(
                 RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE), 
                 threshold="1.25*median"
             )
             final_selector.fit(X_train_genomic, y_train_raw)
+            selected_features = final_selector.get_support()
+            
+            if np.sum(selected_features) == 0:
+                raise ValueError("Feature selector selected zero features")
+            
             X_train_final = final_selector.transform(X_train_genomic)
             X_test_final = final_selector.transform(X_test_genomic)
         else:
@@ -1144,7 +1162,13 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         target_scaler = StandardScaler()
         y_train_scaled = target_scaler.fit_transform(y_train_raw.reshape(-1, 1)).flatten()
         
-        _, _, pred_test_scaled, _, _ = BreedSightTuning(
+        X_train_final, y_train_scaled = shuffle(X_train_final, y_train_scaled, random_state=RANDOM_STATE)
+        
+        final_model_path = os.path.join('saved_models', 'BreedSight_final.h5')
+        final_rf_path = os.path.join('saved_models', 'rf_final.joblib')
+        os.makedirs('saved_models', exist_ok=True)
+        
+        _, _, pred_test_scaled, final_history, _ = BreedSightTuning(
             trainX=X_train_final, 
             trainy=y_train_scaled,
             valX=None,
@@ -1159,7 +1183,9 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             rf_n_estimators=best_params['rf_n_estimators'],
             rf_max_depth=42,
             alpha=0.6,
-            verbose=1
+            verbose=1,
+            model_save_path=final_model_path,
+            rf_save_path=final_rf_path
         )
         
         pred_test = target_scaler.inverse_transform(pred_test_scaled.reshape(-1, 1)).flatten()
@@ -1173,21 +1199,125 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         has_test_phenotypes = 'phenotypes' in testing_data.columns
         if has_test_phenotypes:
             test_pred_final_df['True_Phenotype'] = testing_data['phenotypes']
-
-    # Compile outputs
+            mse_test_final, rmse_test_final, corr_test_final, r2_test_final = calculate_metrics(
+                testing_data['phenotypes'], pred_test
+            )
+            final_model_metrics = {
+                'Test_MSE': mse_test_final,
+                'Test_RMSE': rmse_test_final,
+                'Test_R2': r2_test_final,
+                'Test_Corr': corr_test_final,
+                'N_Features': X_train_final.shape[1],
+                'Epochs': len(final_history.history['loss'])
+            }
+            
+            print(f"\n=== Final Test Results ===")
+            print(f"MSE: {mse_test_final:.4f}, RMSE: {rmse_test_final:.4f}")
+            print(f"R²: {r2_test_final:.4f}, Correlation: {corr_test_final:.4f}")
+    
     train_pred_df = pd.concat(train_predictions, ignore_index=True)
     val_pred_df = pd.concat(val_predictions, ignore_index=True)
+    results_df = pd.DataFrame(outer_results)
     
-    # Plots and CSVs similar to before
-    # (Omit for brevity, assume same as in KFoldCrossValidation)
+    if final_model_metrics:
+        final_results_df = pd.DataFrame([{'Fold': 'Final_Model', **final_model_metrics}])
+        results_df = pd.concat([results_df, final_results_df], ignore_index=True)
+    
+    def generate_plot(true_vals, pred_vals, title, is_test=False):
+        plt.figure(figsize=(8, 6))
+        if is_test and not has_test_phenotypes:
+            pred_values = pred_vals.dropna()
+            if len(pred_values) > 0:
+                plt.hist(pred_values, bins=30)
+                plt.xlabel('Predicted Phenotype')
+                plt.ylabel('Frequency')
+            else:
+                plt.text(0.5, 0.5, 'No valid predictions', ha='center', va='center')
+        else:
+            valid_mask = (~pd.isna(pred_vals)) & (~pd.isna(true_vals))
+            if valid_mask.any():
+                plt.scatter(true_vals[valid_mask], pred_vals[valid_mask], alpha=0.5)
+                plt.xlabel('True Phenotype')
+                plt.ylabel('Predicted Phenotype')
+                coef = np.polyfit(true_vals[valid_mask], pred_vals[valid_mask], 1)
+                poly1d_fn = np.poly1d(coef)
+                plt.plot(true_vals[valid_mask], poly1d_fn(true_vals[valid_mask]), '--k')
+                
+                mse, rmse, corr, r2 = calculate_metrics(true_vals[valid_mask], pred_vals[valid_mask])
+                plt.text(0.05, 0.9, f'R² = {r2:.3f}\nCorr = {corr:.3f}\nRMSE = {rmse:.3f}',
+                         transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.8))
+            else:
+                plt.text(0.5, 0.5, 'No valid predictions', ha='center', va='center')
+        
+        plt.title(title)
+        plot_file = tempfile.NamedTemporaryFile(suffix='.png', delete=False).name
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+        plt.close()
+        return plot_file
+    
+    train_plot_file = generate_plot(train_pred_df['True_Phenotype'], 
+                                  train_pred_df['Predicted_Phenotype'], 
+                                  'Training Set Predictions')
+    
+    val_plot_file = generate_plot(val_pred_df['True_Phenotype'], 
+                                val_pred_df['Predicted_Phenotype'], 
+                                'Validation Set Predictions')
+    
+    test_plot_file = None
+    if not test_pred_final_df.empty:
+        test_plot_file = generate_plot(test_pred_final_df.get('True_Phenotype', None),
+                                      test_pred_final_df['Predicted_Phenotype'],
+                                      'Test Set Predictions (Final Model)', 
+                                      is_test=not has_test_phenotypes)
+    
+    def save_to_temp(df, prefix, fold=None):
+        try:
+            temp_dir = tempfile.gettempdir()
+            os.makedirs(temp_dir, exist_ok=True)
+            timestamp = int(time.time())
+            fold_str = f"_fold{fold}" if fold is not None else ""
+            path = os.path.join(temp_dir, f"{prefix}_predictions_{timestamp}{fold_str}.csv")
+            df.to_csv(path, index=False)
+            return path
+        except Exception as e:
+            print(f"Warning: Failed to save {prefix} predictions: {e}")
+            return None
+    
+    train_csv = save_to_temp(train_pred_df, "train")
+    val_csv = save_to_temp(val_pred_df, "val")
+    test_csv = save_to_temp(test_pred_final_df, "test") if not test_pred_final_df.empty else None
     
     tuning_results_df = pd.DataFrame(outer_results)
     
-    outputs = (
+    feature_importance_df = None
+    if feature_selection and feature_importances:
+        try:
+            all_features = training_additive.columns[1:]
+            importance_data = []
+            
+            for fold_data in feature_importances:
+                for feat_idx, (feat_name, importance) in enumerate(zip(all_features, fold_data['importances'])):
+                    importance_data.append({
+                        'Fold': fold_data['fold'],
+                        'Feature': feat_name,
+                        'Importance': importance,
+                        'Selected': fold_data['selected_features'][feat_idx]
+                    })
+            
+            feature_importance_df = pd.DataFrame(importance_data)
+        except Exception as e:
+            print(f"Warning: Could not create feature importance dataframe: {e}")
+    
+    return (
         train_pred_df,
         val_pred_df,
         test_pred_final_df if not test_pred_final_df.empty else None,
-        # Add plots and csvs here
+        train_plot_file,
+        val_plot_file,
+        test_plot_file,
+        train_csv,
+        val_csv,
+        test_csv,
+        tuning_results_df,
+        feature_importance_df
     )
-
-    return outputs
