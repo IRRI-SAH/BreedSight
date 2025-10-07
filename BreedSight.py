@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Jun 29 18:52:23 2025
-
+Modified on Mon Oct 06 2025 to address data leakage issues
 
 @author: Ashmitha
 """
@@ -245,7 +245,7 @@ def calculate_metrics(true_values, predicted_values):
 
 def KFoldCrossValidation(training_data, training_additive, testing_data, testing_additive,
                         epochs=1000, learning_rate=0.0001, batch_size=64,
-                        outer_n_splits=2, output_file='cross_validation_results.csv',
+                        outer_n_splits=5, output_file='cross_validation_results.csv',
                         train_pred_file='train_predictions.csv',
                         val_pred_file='validation_predictions.csv',
                         test_pred_file='test_predictions.csv',
@@ -567,7 +567,7 @@ def run_cross_validation(training_file, training_additive_file, testing_file, te
         batch_size=64,
         learning_rate=learning_rate,
         feature_selection=feature_selection,
-        outer_n_splits=2
+        outer_n_splits=5
     )
     
     # Prepare files for download
