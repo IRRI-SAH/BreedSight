@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Jun 29 18:52:23 2025
-Modified on Mon Oct 06 2025 to address data leakage issues
+
 
 @author: Ashmitha
 """
@@ -338,7 +338,7 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
         if feature_selection:
             selector = SelectFromModel(
                 RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE),
-                threshold="1.25*median"
+                threshold="median"
             )
             selector.fit(X_train_genomic, outer_trainy)
             X_train_final = selector.transform(X_train_genomic)
@@ -432,7 +432,7 @@ def KFoldCrossValidation(training_data, training_additive, testing_data, testing
     if feature_selection:
         selector = SelectFromModel(
             RandomForestRegressor(n_estimators=200, random_state=RANDOM_STATE),
-            threshold="1.25*median"
+            threshold="median"
         )
         selector.fit(X_train_genomic, y_train_raw)
         X_train_final = selector.transform(X_train_genomic)
@@ -563,11 +563,11 @@ def run_cross_validation(training_file, training_additive_file, testing_file, te
         training_additive=training_additive,
         testing_data=testing_data,
         testing_additive=testing_additive,
-        epochs=1000,
+        epochs=1,
         batch_size=64,
         learning_rate=learning_rate,
         feature_selection=feature_selection,
-        outer_n_splits=10
+        outer_n_splits=2
     )
     
     # Prepare files for download
