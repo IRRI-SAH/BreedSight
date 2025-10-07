@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Tue Oct  7 11:20:01 2025
+
+@author: Ashmi
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Tue Oct  7 10:40:28 2025
 
 @author: Ashmi
@@ -618,7 +625,8 @@ def KFoldCrossValidation(training_data, training_additive, val_data=None, val_ad
                 ), 
                 max_features=100
             )
-            final_selector.fit(X_train_genomic, y_train_raw)
+            y_final_selector = StandardScaler().fit_transform(y_train_raw.reshape(-1, 1)).flatten()
+            final_selector.fit(X_train_genomic, y_final_selector)
             selected_features = final_selector.get_support()
             
             if np.sum(selected_features) == 0:
@@ -823,6 +831,7 @@ def tune_hyperparameters(outer_train_data, outer_train_additive, param_grid,
     
     for params in ParameterGrid(param_grid):
         inner_scores = []
+        inner_thresholds = []
         
         for inner_fold, (inner_train_idx, inner_val_idx) in enumerate(inner_kf.split(training_additive_raw), 1):
             # Split inner fold data
@@ -855,9 +864,10 @@ def tune_hyperparameters(outer_train_data, outer_train_additive, param_grid,
             if feature_selection:
                 selector = SelectFromModel(
                     RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE + inner_fold), 
-                    threshold="1.25*median"
+                    threshold="median"
                 )
-                selector.fit(X_inner_train_genomic, y_inner_train)
+                y_inner_selector = StandardScaler().fit_transform(y_inner_train.reshape(-1, 1)).flatten()
+                selector.fit(X_inner_train_genomic, y_inner_selector)
                 selected_features = selector.get_support()
                 
                 if np.sum(selected_features) == 0:
@@ -866,6 +876,7 @@ def tune_hyperparameters(outer_train_data, outer_train_additive, param_grid,
                 
                 X_inner_train_selected = selector.transform(X_inner_train_genomic)
                 X_inner_val_selected = selector.transform(X_inner_val_genomic)
+                inner_thresholds.append(selector.threshold_)
             else:
                 X_inner_train_selected = X_inner_train_genomic
                 X_inner_val_selected = X_inner_val_genomic
@@ -903,9 +914,11 @@ def tune_hyperparameters(outer_train_data, outer_train_additive, param_grid,
         
         if inner_scores:  # Only store if we have valid scores
             mean_inner_score = np.mean(inner_scores)
+            mean_threshold = np.mean(inner_thresholds) if inner_thresholds else None
             inner_results.append({
                 'params': params,
-                'mean_val_score': mean_inner_score
+                'mean_val_score': mean_inner_score,
+                'mean_threshold': mean_threshold
             })
     
     if not inner_results:
@@ -914,8 +927,9 @@ def tune_hyperparameters(outer_train_data, outer_train_additive, param_grid,
     # Select best parameters from inner loop
     best_inner_result = max(inner_results, key=lambda x: x['mean_val_score'])
     best_params = best_inner_result['params']
+    best_threshold = best_inner_result['mean_threshold']
     
-    return best_params, inner_results
+    return best_params, best_threshold, inner_results
 
 ###################################################### Running cross validation ##########################################
 
@@ -1002,7 +1016,7 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         outer_val_data = training_data.iloc[outer_val_idx]
         outer_val_additive = training_additive.iloc[outer_val_idx]
         
-        best_params, tuning_results_fold = tune_hyperparameters(
+        best_params, best_threshold, tuning_results_fold = tune_hyperparameters(
             outer_train_data=outer_train_data,
             outer_train_additive=outer_train_additive,
             param_grid=param_grid,
@@ -1028,11 +1042,12 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         y_outer_val = outer_val_data['phenotypes'].values
         
         if feature_selection:
+            y_outer_selector = StandardScaler().fit_transform(y_outer_train.reshape(-1, 1)).flatten()
             selector = SelectFromModel(
                 RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE + outer_fold), 
-                threshold="1.25*median"
+                threshold=best_threshold if best_threshold is not None else "1.25*median"
             )
-            selector.fit(X_outer_train_genomic, y_outer_train)
+            selector.fit(X_outer_train_genomic, y_outer_selector)
             selected_features = selector.get_support()
             
             if np.sum(selected_features) == 0:
@@ -1106,7 +1121,8 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             'mean_val_corr': corr_val,
             'mean_val_rmse': rmse_val,
             'outer_fold': outer_fold,
-            'n_features': X_outer_train_selected.shape[1]
+            'n_features': X_outer_train_selected.shape[1],
+            'best_threshold': best_threshold
         })
         
         print(f"Fold {outer_fold} Results:")
@@ -1124,6 +1140,9 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             param_counts[param_tuple] = param_counts.get(param_tuple, 0) + 1
         best_params_tuple = max(param_counts, key=param_counts.get)
         best_params = dict(best_params_tuple)
+        
+        all_thresholds = [r['best_threshold'] for r in outer_results if r['best_threshold'] is not None]
+        mean_final_threshold = np.mean(all_thresholds) if all_thresholds else "1.25*median"
         
         X_train_genomic, ref_features = compute_genomic_features(
             training_additive_raw, 
@@ -1145,9 +1164,10 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
             print("Performing final feature selection...")
             final_selector = SelectFromModel(
                 RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE), 
-                threshold="1.25*median"
+                threshold=mean_final_threshold
             )
-            final_selector.fit(X_train_genomic, y_train_raw)
+            y_final_selector = StandardScaler().fit_transform(y_train_raw.reshape(-1, 1)).flatten()
+            final_selector.fit(X_train_genomic, y_final_selector)
             selected_features = final_selector.get_support()
             
             if np.sum(selected_features) == 0:
