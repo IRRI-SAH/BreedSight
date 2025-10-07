@@ -563,7 +563,7 @@ def run_cross_validation(training_file, training_additive_file, testing_file, te
         training_additive=training_additive,
         testing_data=testing_data,
         testing_additive=testing_additive,
-        epochs=1,
+        epochs=1000,
         batch_size=64,
         learning_rate=learning_rate,
         feature_selection=feature_selection,
@@ -591,3 +591,4 @@ def run_cross_validation(training_file, training_additive_file, testing_file, te
         val_csv,
         test_csv
     )
+
