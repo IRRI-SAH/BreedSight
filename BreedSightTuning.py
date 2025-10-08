@@ -43,7 +43,7 @@ RANDOM_STATE = 42
 
 # Model
 def BreedSightTuning(trainX, trainy, valX=None, valy=None, testX=None, testy=None, 
-                     epochs=1, batch_size=64, learning_rate=0.0001, 
+                     epochs=1000, batch_size=64, learning_rate=0.0001, 
                      l2_reg=0.0001, dropout_rate=0.5, 
                      rf_n_estimators=200, rf_max_depth=42, 
                      alpha=0.6, verbose=1, model_save_path=None, rf_save_path=None):
@@ -64,7 +64,7 @@ def BreedSightTuning(trainX, trainy, valX=None, valy=None, testX=None, testy=Non
     # Model Architecture
     def build_fnn_model(input_shape):
         inputs = tf.keras.Input(shape=(input_shape,))   
-        x = Dense(512, kernel_initializer='he_normal', 
+        x = Dense(16, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(inputs)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
@@ -72,7 +72,7 @@ def BreedSightTuning(trainX, trainy, valX=None, valy=None, testX=None, testy=Non
         
         # First residual block
         res = x
-        x = Dense(256, kernel_initializer='he_normal', 
+        x = Dense(8, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
@@ -88,7 +88,7 @@ def BreedSightTuning(trainX, trainy, valX=None, valy=None, testX=None, testy=Non
         
         # Second residual block
         res = x
-        x = Dense(128, kernel_initializer='he_normal', 
+        x = Dense(4, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
@@ -103,13 +103,13 @@ def BreedSightTuning(trainX, trainy, valX=None, valy=None, testX=None, testy=Non
         x = LeakyReLU(alpha=0.1)(x)
 
         # Final layers
-        x = Dense(64, kernel_initializer='he_normal', 
+        x = Dense(4, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
         x = LeakyReLU(alpha=0.1)(x)
 
-        x = Dense(32, kernel_initializer='he_normal', 
+        x = Dense(2, kernel_initializer='he_normal', 
                  kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization()(x)
         x = Dropout(dropout_rate)(x)
@@ -274,9 +274,9 @@ def validate_sample_ids(df, dataset_name, id_column=0):
 
 # Cross validation
 def KFoldCrossValidation(training_data, training_additive, val_data=None, val_additive=None,
-                         epochs=1, learning_rate=0.0001, batch_size=2,
+                         epochs=1, learning_rate=0.0001, batch_size=64,
                          l2_reg=0.0001, dropout_rate=0.5, rf_n_estimators=200,
-                         rf_max_depth=42, alpha=0.6, outer_n_splits=2, 
+                         rf_max_depth=42, alpha=0.6, outer_n_splits=10, 
                          feature_selection=True, save_models=True, model_dir='saved_models',
                          verbose=1):
     # Initial Validation Checks
@@ -525,7 +525,7 @@ def KFoldCrossValidation(training_data, training_additive, val_data=None, val_ad
                     random_state=RANDOM_STATE,
                     n_jobs=-1
                 ), 
-                threshold="1.25*median"
+                threshold="median"
             )
             y_final_selector = StandardScaler().fit_transform(y_train_raw.reshape(-1, 1)).flatten()
             final_selector.fit(X_train_genomic, y_final_selector)
@@ -716,7 +716,7 @@ def KFoldCrossValidation(training_data, training_additive, val_data=None, val_ad
 
 # Hyperparameter tuning
 def tune_hyperparameters(outer_train_data, outer_train_additive, param_grid, 
-                        feature_selection=True, inner_n_splits=2):
+                        feature_selection=True, inner_n_splits=5):
     assert isinstance(outer_train_data, pd.DataFrame), "Training data must be DataFrame"
     assert isinstance(outer_train_additive, pd.DataFrame), "Training additive data must be DataFrame"
     
@@ -1250,3 +1250,4 @@ def run_cross_validation(training_file, training_additive_file, testing_file=Non
         tuning_results_df,
         feature_importance_df
     )
+
