@@ -54,6 +54,16 @@ Cross-validation represents a standard methodology for assessing the predictive 
 **Hyperparameter Optimization** 
 
 BreedSight integrates DNNs with an RF ensemble, utilizing an advanced hyperparameter optimization framework to strike a balance between predictive accuracy and computational efficiency. The DNN features a five-layer feedforward architecture (512-256-128-64-32 neurons) with residual connections to mitigate vanishing gradients and LeakyReLU activations (α=0.1) to ensure robust gradient flow. Hyperparameters were tuned using nested 10-fold cross-validation, with the outer loop assessing generalization and the inner loop optimizing via grid search over: learning rate ([1e-5, 1e-2], default 0.0001 with Adam optimizer), L2 regularization ([1e-4, 1e-1], selected 0.001), dropout rate ([0.5, 0.9], chosen 0.8), batch size ([32, 256], chosen  64), and network depth (3–5 layers, selected 5). Early stopping (patience=15) prevents overfitting. The RF component uses 200 estimators with a maximum depth of 42, optimized via out-of-bag error analysis. Predictions are combined via a weighted ensemble (α tuned in [0.6-0.8] based on validation performance. This hybrid architecture, validated through 10-fold cross-validation, leverages the DNN’s capacity for complex patterns and the RF’s robustness, achieving high accuracy and efficiency. 
+**Preventing data leakage issue ** 
+Hyperparameter Tuning for Final Model: Re-tunes hyperparameters on the full training data to avoid leakage from outer fold validation data.
+Isolate Target Scaling: Logs scaler parameters (mean, scale) to verify independence across folds.
+Fold Isolation Logging: Adds logging for sample and feature counts per fold.
+Consistent Return Values: Returns val_pred_df instead of val_predictions in run_cross_validation.
+Feature Threshold Tuning: Includes feature selection thresholds in the hyperparameter grid.
+Increased Epochs for Tuning: Allows tuning of epochs for more robust hyperparameter selection.
+Feature Importance Validation: Validates alignment of feature names and importances.
+Zero-Feature Handling: Raises errors or uses all features consistently when no features are selected.
+Numerical Stability: Adds checks for small or zero mean_diag in feature computation.
 
 ## 📂 Input Data Requirements
 **Accepted Formats:**
