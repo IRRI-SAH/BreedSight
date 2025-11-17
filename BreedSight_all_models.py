@@ -1323,7 +1323,7 @@ if __name__ == "__main__":
             # Cross-validation parameters
             outer_n_splits=5,
             feature_selection=True,
-            heritability=0.82,
+            heritability=0.82,#change according to the heritability user getting after phenotypic data analysis
             use_raw_genotypes=False,
             use_pca=True,
             n_components=50,
