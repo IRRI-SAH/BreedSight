@@ -47,4 +47,5 @@ write.csv(dominance_matrix,
           row.names = FALSE)
 
 
+
  write.csv(additive_matrix, "Additive_Matrix.csv", row.names = TRUE)  # Adds empty first column in Excel
